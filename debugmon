@@ -1,0 +1,133 @@
+-- Debug Monitor
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Stats = game:GetService("Stats")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
+
+local Frame = Instance.new("Frame", ScreenGui)
+Frame.Size = UDim2.new(0, 220, 0, 220)
+Frame.Position = UDim2.new(1, -230, 0, 10)
+Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+Frame.BackgroundTransparency = 0.3
+Frame.BorderSizePixel = 0
+Frame.Active = true
+
+local Title = Instance.new("TextLabel", Frame)
+Title.Size = UDim2.new(1, -10, 0, 20)
+Title.Position = UDim2.new(0, 5, 0, 2)
+Title.BackgroundTransparency = 1
+Title.TextColor3 = Color3.fromRGB(200, 200, 200)
+Title.Font = Enum.Font.Code
+Title.TextSize = 14
+Title.TextXAlignment = Enum.TextXAlignment.Left
+Title.Text = "Debug Monitor"
+
+local Info = Instance.new("TextLabel", Frame)
+Info.Size = UDim2.new(1, -10, 1, -30)
+Info.Position = UDim2.new(0, 5, 0, 25)
+Info.BackgroundTransparency = 1
+Info.TextColor3 = Color3.fromRGB(255, 255, 255)
+Info.TextXAlignment = Enum.TextXAlignment.Left
+Info.TextYAlignment = Enum.TextYAlignment.Top
+Info.Font = Enum.Font.Code
+Info.TextSize = 14
+Info.Text = ""
+
+-- Resize Button
+local ResizeBtn = Instance.new("TextButton", Frame)
+ResizeBtn.Size = UDim2.new(0, 16, 0, 16)
+ResizeBtn.Position = UDim2.new(1, -18, 1, -18)
+ResizeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+ResizeBtn.Text = "◢"
+ResizeBtn.TextSize = 12
+ResizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+ResizeBtn.BorderSizePixel = 0
+ResizeBtn.AutoButtonColor = true
+
+local resizing = false
+ResizeBtn.MouseButton1Down:Connect(function()
+    resizing = true
+end)
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        resizing = false
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if resizing and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local newX = math.max(220, input.Position.X - Frame.AbsolutePosition.X)
+        local newY = math.max(220, input.Position.Y - Frame.AbsolutePosition.Y)
+        Frame.Size = UDim2.new(0, newX, 0, newY)
+    end
+end)
+
+-- FPS Counter
+local fps, frames, lastTime = 0, 0, tick()
+RunService.RenderStepped:Connect(function()
+    frames += 1
+    local now = tick()
+    if now - lastTime >= 1 then
+        fps = frames
+        frames = 0
+        lastTime = now
+    end
+end)
+
+-- Info Update
+RunService.RenderStepped:Connect(function()
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+
+    local pos = hrp and hrp.Position or Vector3.zero
+    local speed = hum and (hum.MoveDirection.Magnitude * hum.WalkSpeed) or 0
+    local walkspeed = hum and hum.WalkSpeed or 0
+    local jumppower = hum and hum.JumpPower or 0
+    local health = hum and hum.Health or 0
+    local maxHealth = hum and hum.MaxHealth or 0
+
+    local pingStat = Stats.Network.ServerStatsItem["Data Ping"]
+    local ping = pingStat and math.floor(pingStat:GetValue()) or -1
+
+    local playerCount = #Players:GetPlayers()
+    local gameTime = math.floor(workspace.DistributedGameTime)
+
+    Info.Text = string.format(
+        "FPS: %d\nPing: %s ms\nPlayers: %d\n\n" ..
+        "Health: %d / %d\nWalkSpeed: %d\nJumpPower: %d\nSpeed: %.1f\n\n" ..
+        "X: %.1f\nY: %.1f\nZ: %.1f\nGame Time: %ds",
+        fps, ping >= 0 and ping or "error", playerCount,
+        health, maxHealth, walkspeed, jumppower, speed,
+        pos.X, pos.Y, pos.Z, gameTime
+    )
+end)
+
+-- Dragging
+local dragging, dragStart, startPos
+Frame.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 
+       and input.Position.X < Frame.AbsolutePosition.X + Frame.AbsoluteSize.X - 20 then
+        dragging = true
+        dragStart = input.Position
+        startPos = Frame.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                dragging = false
+            end
+        end)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        local delta = input.Position - dragStart
+        Frame.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
+    end
+end)
